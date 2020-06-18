@@ -93,10 +93,10 @@ class ToAbsoluteCoords(object):
 class ToPercentCoords(object):
     def __call__(self, image, boxes=None, labels=None):
         height, width, channels = image.shape
-        boxes[:, 0] /= width
-        boxes[:, 2] /= width
-        boxes[:, 1] /= height
-        boxes[:, 3] /= height
+        boxes[:, 0] = boxes[:, 0] / width
+        boxes[:, 2] = boxes[:, 2] / width
+        boxes[:, 1] = boxes[:, 1] / height
+        boxes[:, 3] = boxes[:, 3] / height
 
         return image, boxes, labels
 
@@ -221,24 +221,24 @@ class RandomSampleCrop(object):
     def __init__(self):
         self.sample_options = (
             # using entire original input image
-            None,
+            # None,
             # sample a patch s.t. MIN jaccard w/ obj in .1,.3,.4,.7,.9
             (0.1, None),
-            (0.3, None),
-            (0.7, None),
-            (0.9, None),
+            # (0.3, None),
+            # (0.7, None),
+            # (0.9, None),
             # randomly sample a patch
-            (None, None),
+            # (None, None),
         )
 
     def __call__(self, image, boxes=None, labels=None):
         height, width, _ = image.shape
         while True:
             # randomly choose a mode
-            mode = random.choice(self.sample_options)
-            if mode is None:
-                return image, boxes, labels
-
+            # mode = random.choice(self.sample_options)
+            # if mode is None:
+            #     return image, boxes, labels
+            mode = (0.1, None)
             min_iou, max_iou = mode
             if min_iou is None:
                 min_iou = float('-inf')
@@ -247,23 +247,33 @@ class RandomSampleCrop(object):
 
             # max trails (50)
             for _ in range(50):
+                #print(_)
                 current_image = image
 
-                w = random.uniform(0.3 * width, width)
-                h = random.uniform(0.3 * height, height)
+                w = random.uniform(0.4 * width, 0.6 * width)
+                h = random.uniform(0.4 * height, 0.6 * height)
 
                 # aspect ratio constraint b/t .5 & 2
-                if h / w < 0.5 or h / w > 2:
-                    continue
+                # if h / w < 0.5 or h / w > 2:
+                #     continue
 
                 left = random.uniform(width - w)
                 top = random.uniform(height - h)
+                #print('width={}, height={}'.format(w,h))
+                #print('left={}, top={}'.format(left,top))
 
                 # convert to integer rect x1,y1,x2,y2
                 rect = np.array([int(left), int(top), int(left+w), int(top+h)])
 
                 # calculate IoU (jaccard overlap) b/t the cropped and gt boxes
+                # print('boxes {}'.format(boxes))
+                # print('rect {}'.format(rect))
+                
                 overlap = jaccard_numpy(boxes, rect)
+                #print('overlap={}'.format(overlap))
+                #print('overlap min={}, overlap max={}'.format(overlap.min(), overlap.max()))
+                #print('min_iou={}'.format(min_iou))
+                # exit()
 
                 # is min and max overlap constraint satisfied? if not try again
                 if overlap.min() < min_iou and max_iou < overlap.max():
@@ -314,7 +324,8 @@ class Expand(object):
         self.mean = mean
 
     def __call__(self, image, boxes, labels):
-        if random.randint(2):
+        #if random.randint(2):
+        if np.random.random() < 0.9:
             return image, boxes, labels
 
         height, width, depth = image.shape
@@ -344,6 +355,26 @@ class RandomMirror(object):
             image = image[:, ::-1]
             boxes = boxes.copy()
             boxes[:, 0::2] = width - boxes[:, 2::-2]
+        return image, boxes, classes
+
+
+class RandomRotate(object):
+    def __call__(self, image, boxes, classes):
+        height, width, _ = image.shape
+        # image = np.transpose(image, (1, 0, 2))[::-1,:]
+        r = random.randint(4) # rotate uniformally between (0, 90, 180, 270) degrees.
+        image = np.rot90(image, r, (0,1))
+        for i in range(r):
+            boxes = boxes.copy()
+            X_min = boxes[:, 0].copy()
+            X_max = boxes[:, 2].copy()
+            boxes[:,0] = boxes[:,1]
+            boxes[:,2] = boxes[:,3]
+            boxes[:,1] = width - X_max
+            boxes[:,3] = width - X_min
+            t = width
+            width = height
+            height = t
         return image, boxes, classes
 
 
@@ -408,6 +439,26 @@ class SSDAugmentation(object):
             Expand(self.mean),
             RandomSampleCrop(),
             RandomMirror(),
+            ToPercentCoords(),
+            Resize(self.size),
+            SubtractMeans(self.mean)
+        ])
+
+    def __call__(self, img, boxes, labels):
+        return self.augment(img, boxes, labels)
+
+class SSDBoneCellAugmentation(object):
+    def __init__(self, size=300, mean=(104, 117, 123)):
+        self.mean = mean
+        self.size = size
+        self.augment = Compose([
+            ConvertFromInts(),
+            ToAbsoluteCoords(),
+            PhotometricDistort(),
+            Expand(self.mean),
+            RandomSampleCrop(),
+            RandomMirror(),
+            RandomRotate(),
             ToPercentCoords(),
             Resize(self.size),
             SubtractMeans(self.mean)

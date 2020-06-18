@@ -40,3 +40,18 @@ coco = {
     'clip': True,
     'name': 'COCO',
 }
+
+bonecell = {
+    'num_classes': 5,
+    'lr_steps': (80000, 100000, 120000),
+    'max_iter': 120000,
+    'feature_maps': [38, 19, 10, 5],
+    'min_dim': 300,
+    'steps': [8, 16, 32, 64],
+    'min_sizes': [30, 60, 111, 162],
+    'max_sizes': [60, 111, 162, 213],
+    'aspect_ratios': [[2], [2, 3], [2, 3], [2, 3]],
+    'variance': [0.1, 0.2],
+    'clip': True,
+    'name': 'BONECELL',
+}
