@@ -44,7 +44,7 @@ parser.add_argument('--confidence_threshold', default=0.01, type=float,
                     help='Detection confidence threshold')
 parser.add_argument('--top_k', default=5, type=int,
                     help='Further restrict the number of predictions to parse')
-parser.add_argument('--cuda', default=True, type=str2bool,
+parser.add_argument('--cuda', default=False, type=str2bool,
                     help='Use cuda to train model')
 parser.add_argument('--voc_root', default=VOC_ROOT,
                     help='Location of VOC root directory')
@@ -361,7 +361,58 @@ cachedir: Directory for caching the annotations
     return rec, prec, ap
 
 
-def test_net(save_folder, net, cuda, dataset, transform, top_k,
+# def test_net(save_folder, net, cuda, dataset, transform, top_k,
+#              im_size=300, thresh=0.05):
+#     num_images = len(dataset)
+#     # all detections are collected into:
+#     #    all_boxes[cls][image] = N x 5 array of detections in
+#     #    (x1, y1, x2, y2, score)
+#     all_boxes = [[[] for _ in range(num_images)]
+#                  for _ in range(len(labelmap)+1)]
+
+#     # timers
+#     _t = {'im_detect': Timer(), 'misc': Timer()}
+#     output_dir = get_output_dir('ssd300_120000', set_type)
+#     det_file = os.path.join(output_dir, 'detections.pkl')
+
+#     for i in range(num_images):
+#         im, gt, h, w = dataset.pull_item(i)
+
+#         x = Variable(im.unsqueeze(0))
+#         if args.cuda:
+#             x = x.cuda()
+#         _t['im_detect'].tic()
+#         detections = net(x).data
+#         detect_time = _t['im_detect'].toc(average=False)
+
+#         # skip j = 0, because it's the background class
+#         for j in range(1, detections.size(1)):
+#             dets = detections[0, j, :]
+#             mask = dets[:, 0].gt(0.).expand(5, dets.size(0)).t()
+#             dets = torch.masked_select(dets, mask).view(-1, 5)
+#             if dets.size(0) == 0:
+#                 continue
+#             boxes = dets[:, 1:]
+#             boxes[:, 0] *= w
+#             boxes[:, 2] *= w
+#             boxes[:, 1] *= h
+#             boxes[:, 3] *= h
+#             scores = dets[:, 0].cpu().numpy()
+#             cls_dets = np.hstack((boxes.cpu().numpy(),
+#                                   scores[:, np.newaxis])).astype(np.float32,
+#                                                                  copy=False)
+#             all_boxes[j][i] = cls_dets
+
+#         print('im_detect: {:d}/{:d} {:.3f}s'.format(i + 1,
+#                                                     num_images, detect_time))
+
+#     with open(det_file, 'wb') as f:
+#         pickle.dump(all_boxes, f, pickle.HIGHEST_PROTOCOL)
+
+#     print('Evaluating detections')
+#     evaluate_detections(all_boxes, output_dir, dataset)
+
+def test_net(save_folder, results_file_name, net, cuda, dataset, transform, top_k,
              im_size=300, thresh=0.05):
     num_images = len(dataset)
     # all detections are collected into:
@@ -372,17 +423,20 @@ def test_net(save_folder, net, cuda, dataset, transform, top_k,
 
     # timers
     _t = {'im_detect': Timer(), 'misc': Timer()}
-    output_dir = get_output_dir('ssd300_120000', set_type)
-    det_file = os.path.join(output_dir, 'detections.pkl')
+    # output_dir = get_output_dir('ssd300_120000', set_type)
+    # output_dir = get_output_dir(save_folder, set_type)
+    det_file = os.path.join(save_folder, results_file_name)
 
     for i in range(num_images):
-        im, gt, h, w = dataset.pull_item(i)
-
-        x = Variable(im.unsqueeze(0))
+        print('-'*100)
+        print(dataset.ids[i])
+        im, gt, _, h, w = dataset.pull_item(i)
+        x = Variable(im.unsqueeze(0)).float()
         if args.cuda:
             x = x.cuda()
         _t['im_detect'].tic()
         detections = net(x).data
+        # print(detections)
         detect_time = _t['im_detect'].toc(average=False)
 
         # skip j = 0, because it's the background class
@@ -393,10 +447,15 @@ def test_net(save_folder, net, cuda, dataset, transform, top_k,
             if dets.size(0) == 0:
                 continue
             boxes = dets[:, 1:]
-            boxes[:, 0] *= w
-            boxes[:, 2] *= w
-            boxes[:, 1] *= h
-            boxes[:, 3] *= h
+            boxes[:, 0] *= im_size
+            boxes[:, 2] *= im_size
+            boxes[:, 1] *= im_size
+            boxes[:, 3] *= im_size
+            # boxes[:, 0] *= w
+            # boxes[:, 2] *= w
+            # boxes[:, 1] *= h
+            # boxes[:, 3] *= h
+
             scores = dets[:, 0].cpu().numpy()
             cls_dets = np.hstack((boxes.cpu().numpy(),
                                   scores[:, np.newaxis])).astype(np.float32,
@@ -408,10 +467,6 @@ def test_net(save_folder, net, cuda, dataset, transform, top_k,
 
     with open(det_file, 'wb') as f:
         pickle.dump(all_boxes, f, pickle.HIGHEST_PROTOCOL)
-
-    print('Evaluating detections')
-    evaluate_detections(all_boxes, output_dir, dataset)
-
 
 def evaluate_detections(box_list, output_dir, dataset):
     write_voc_results_file(box_list, dataset)

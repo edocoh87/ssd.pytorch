@@ -16,10 +16,10 @@ import numpy as np
 
 # ignore classes with label value -1.
 BONE_CELL_CLASSES_MAP = {
-    'p': 0,
-    'g': 1,
-    '0_1': 2,
-    '0_2': 3,
+    'p': 1,
+    'g': 2,
+    '0_1': 3,
+    '0_2': 4,
 }
 
 # format: BGR
@@ -218,3 +218,53 @@ class BoneCellDetection(data.Dataset):
         img, target, original_target, height, width = self.pull_item(index)
         return draw_bbox_on_img(img, pred_bbox, bbox_format='pred', get_area=get_area)
 
+
+class BoneCellInfer(BoneCellDetection):
+    """BoneCell Detection Dataset Object
+    input is image, target is annotation
+    Arguments:
+        root (string): filepath to BoneCell folder.
+        image_set (string): imageset to use (eg. 'train', 'val', 'test')
+        transform (callable, optional): transformation to perform on the
+            input image
+        target_transform (callable, optional): transformation to perform on the
+            target `annotation`
+            (eg: take in caption string, return tensor of word indices)
+        dataset_name (string, optional): which dataset to load
+            (default: 'VOC2007')
+    """
+    def __init__(self, root, transform, target_transform=None, dataset_name='INFER'):
+        super().__init__(root=root, transform=transform,
+                            target_transform=target_transform, dataset_name=dataset_name)
+        
+    def pull_item(self, index):
+        img_id = self.ids[index]
+        img = cv2.imread(img_id + '.png')
+        height, width, channels = img.shape
+        img, _, _ = self.transform(img, None, None)
+        img = img[:, :, (2, 1, 0)]
+        return torch.from_numpy(img).permute(2, 0, 1), None, None, height, width
+        draw_bbox_on_img
+
+    def draw_gt(self, index, get_area=False):
+        img, target, original_target, height, width = self.pull_item(index)
+        return draw_bbox_on_img(img, [], get_area=False)
+
+    def draw_pred(self, index, pred_bbox, get_area=False):
+        img, target, original_target, height, width = self.pull_item(index)
+        return draw_bbox_on_img(img, pred_bbox, bbox_format='pred', get_area=False)
+
+# def base_transform(image, size, mean):
+#     x = cv2.resize(image, (size, size)).astype(np.float32)
+#     x -= mean
+#     x = x.astype(np.float32)
+#     return x
+
+
+# class BaseTransform:
+#     def __init__(self, size, mean):
+#         self.size = size
+#         self.mean = np.array(mean, dtype=np.float32)
+
+#     def __call__(self, image, boxes=None, labels=None):
+#         return base_transform(image, self.size, self.mean), boxes, labels
