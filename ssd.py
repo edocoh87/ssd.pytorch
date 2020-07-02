@@ -196,10 +196,10 @@ mbox = {
 }
 
 
-# def build_ssd(phase, size, num_classes):
-def build_ssd(phase, cfg):
+def build_ssd(phase, cfg, num_classes):
+# def build_ssd(phase, cfg):
     size = cfg['min_dim']
-    num_classes = cfg['num_classes']
+    # num_classes = cfg['num_classes']
     if phase != "test" and phase != "train":
         print("ERROR: Phase: " + phase + " not recognized")
         return
