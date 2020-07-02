@@ -98,8 +98,8 @@ def train():
         import visdom
         viz = visdom.Visdom()
 
-    ssd_net = build_ssd('train', voc, cfg['num_classes'])
-    # ssd_net = build_ssd('train', cfg['min_dim'], cfg['num_classes'])
+    # ssd_net = build_ssd('train', voc, cfg['num_classes'])
+    ssd_net = build_ssd('train', cfg['min_dim'], cfg['num_classes'])
     net = ssd_net
 
     if args.cuda:
